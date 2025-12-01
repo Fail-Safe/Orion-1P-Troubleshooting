@@ -16,12 +16,20 @@ This repository contains test pages and tools to help diagnose and measure the p
 3. **Run the Automated Focus Test** (recommended):
    - Click "Extended Test (10 runs)"
    - Wait for completion and click "Download JSON"
-   - Test in multiple browsers for comparison
+   - Save the file to `test-processor/` folder
+   - Repeat in other browsers for comparison
 
-4. **Record your results** using the template:
+4. **Process your results:**
+   ```bash
+   ./scripts/process-test-results.sh
+   ```
+   This converts the JSON files into formatted Markdown tables.
+
+5. **Record your results:**
    ```bash
    cp test-results/TEMPLATE.md test-results/YourUsername.results.md
    ```
+   Paste the system info from `./scripts/collect-system-info.sh` and the processed results into your file.
 
 ---
 
