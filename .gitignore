@@ -6,3 +6,6 @@
 # Ignore Windows system files
 Thumbs.db
 Desktop.ini
+
+# Ignore exported test JSON files (users should not commit these)
+test-processor/*.json

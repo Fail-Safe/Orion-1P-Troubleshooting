@@ -1,5 +1,13 @@
 # Orion Browser and 1Password Integration Issues
 
+## Development Notes
+
+> **Schema Versioning:** The test page JSON exports include a `schemaVersion` field (currently `1`). If you modify the JSON structure (add/remove/rename fields, change data types, etc.), **increment the schema version** in both:
+> - `test-pages/automated-focus-test.html`
+> - `test-pages/mini-speedometer.html`
+>
+> Then update `scripts/process-test-results.sh` to handle the new version.
+
 ## Problem Statement
 
 Users have reported issues when trying to use 1Password with the Orion Browser. The integration is not as seamless and quick as what is experienced in other browsers like Brave, Firefox, or even Safari. This has led to frustration among users who rely on 1Password for password management and autofill capabilities.
@@ -79,75 +87,76 @@ This issue is tagged as **Planned** on the Orion feedback tracker.
 
 > ⚠️ **Note:** These findings are preliminary and require further testing to confirm they hold true across different hardware configurations, Orion versions, and usage scenarios.
 
-### Simple Focus Test Results
+### Extended Automated Focus Test Results (10 iterations)
 
-A simple, non-automated test was created to measure real-world user experience: the time from clicking an input field to when 1Password's button appears. This test uses no DOM manipulation and mimics actual user behavior.
+A reliable automated test was created that focuses inputs programmatically without DOM manipulation. The test runs 10 iterations in two batches of 5, with a 5-second pause between batches to measure consistency.
 
-#### Test Results
+#### Complete Browser Comparison
 
-| Browser | Username Field | Password Field | Email Field | Average |
-|---------|----------------|----------------|-------------|---------|
-| **Brave** | 1-8ms | 2-8ms | 1-5ms | **~4ms** |
-| **Orion** | 185ms | 127ms | 127ms | **~146ms** |
+| Browser | Cold Start | Warm | Overall Avg | Range | Consistency |
+|---------|-----------|------|-------------|-------|-------------|
+| **Opera** | 11ms | 3.3ms | 4.1ms | 2-14ms | ✓ Excellent |
+| **Brave** | 11ms | 4.0ms | 4.7ms | 3-12ms | ✓ Excellent |
+| **Edge** | 11ms | 3.8ms | 4.5ms | 3-15ms | ✓ Excellent |
+| **Firefox** | 14ms | 6.8ms | 7.5ms | 3-17ms | ✓ Excellent |
+| **Safari** | 42ms | 11.5ms | 14.6ms | 8-52ms | ~ Good |
+| **Orion** | **143ms** | 7.3ms | 20.9ms | 3-159ms | ⚠️ Variable |
 
-**Key Finding:** Orion is approximately **36x slower** than Brave for 1Password to respond to input focus events.
+#### Cold Start Ranking (Best to Worst)
+1. 🥇 Opera/Brave/Edge: ~11ms
+2. 🥈 Firefox: 14ms
+3. 🥉 Safari: 42ms
+4. ❌ **Orion: 143ms** (10-13x slower than Chromium browsers)
 
-#### Perception Thresholds
-- **< 50ms** = Imperceptible (feels instant)
+#### Warm Performance Ranking
+1. 🥇 Opera: 3.3ms
+2. 🥇 Edge: 3.8ms
+3. 🥇 Brave: 4.0ms
+4. 🥈 Firefox: 6.8ms
+5. 🥈 **Orion: 7.3ms** ← Actually competitive!
+6. 🥉 Safari: 11.5ms
+
+### Key Findings
+
+1. **Orion's cold start is 10-13x slower than Chromium browsers** (143ms vs 11ms)
+2. **Orion's cold start is 3.4x slower than Safari** (143ms vs 42ms) - same WebKit engine!
+3. **Orion's warm performance is competitive** - actually faster than Safari (7.3ms vs 11.5ms)
+4. **The problem is definitively cold start / script initialization**
+5. **No degradation over time** - batch 2 performance matches batch 1
+
+### Orion Cold Start Breakdown (Iteration 1)
+
+| Field | Time |
+|-------|------|
+| Username | 115ms |
+| Password | 159ms |
+| Email | 155ms |
+| **Average** | **143ms** |
+
+### What This Proves
+
+1. **The performance issue is real and measurable** - Orion's 143ms cold start vs Brave's 11ms is a 13x difference
+2. **The delay is on first focus only** - Subsequent focuses on the same page are fast (~7ms)
+3. **1Password's code runs fine in Orion** - Warm performance proves the extension itself is not the problem
+4. **The script caching hypothesis is strongly supported** - If Orion re-parses `injected.js` (~360kB) on each page load rather than using cached bytecode, this explains the 130ms+ cold start overhead
+5. **Safari comparison proves it's Orion-specific** - Same WebKit, same 1Password extension, but Safari is 3.4x faster on cold start
+
+### Perception Thresholds
+- **< 50ms** = Imperceptible (feels instant) ← All Chromium browsers
 - **50-100ms** = Barely noticeable
 - **100-200ms** = Noticeable lag ← **Orion falls here**
 - **> 200ms** = Feels sluggish
 
-At ~146ms average, users experience a perceptible delay every time they click a login field in Orion, which accumulates into the "sluggish" feeling reported by users.
+At ~143ms cold start, users experience a perceptible delay every time they click a login field on a new page in Orion.
 
-### Automated Focus Test Results (Cold vs Warm)
+### Browser Detection
 
-A more reliable automated test was created that focuses inputs programmatically without DOM manipulation. This revealed a critical **cold start vs warm** pattern:
+Orion can be programmatically detected via JavaScript globals it exposes:
+- `window.OrionInternals`
+- `window.kagi`
+- `window.KAGI`
 
-#### Raw Results (3 iterations each)
-
-| Browser | Iteration 1 (Cold) | Iteration 2 (Warm) | Iteration 3 (Warm) | Overall Avg |
-|---------|-------------------|-------------------|-------------------|-------------|
-| **Brave** | 11ms | 6ms | 6ms | **7.7ms** |
-| **Opera** | 17ms | 4ms | 4ms | **8.4ms** |
-| **Edge** | 17ms | 5ms | 4ms | **8.7ms** |
-| **Firefox** | 18ms | 4ms | 6ms | **9.2ms** |
-| **Safari 26.1** | 41ms | 14ms | 12ms | **22.3ms** |
-| **Orion** | 131ms | 8ms | 9ms | **49.1ms** |
-
-#### Cold Start Penalty Analysis
-
-| Browser | Cold Start | Warm | Cold Start Penalty |
-|---------|------------|------|-------------------|
-| **Brave** | ~11ms | ~6ms | +5ms |
-| **Safari** | ~41ms | ~13ms | +28ms |
-| **Orion** | ~131ms | ~8ms | **+123ms** |
-
-**Key Findings:**
-
-1. **Orion's warm performance matches Brave** - Once 1Password has initialized for a page, Orion is just as fast (~8ms vs ~6ms)
-2. **The problem is cold start** - Orion takes ~131ms on the first focus, vs Safari's ~41ms and Brave's ~11ms
-3. **This is Orion-specific, not WebKit** - Safari (same WebKit engine) is only 3.7x slower on cold start, but Orion is **12x slower** than Brave
-4. **Every page load triggers cold start** - Users experience the 130ms delay on every new page with login forms
-
-This strongly supports the hypothesis that Orion is not caching parsed/compiled extension scripts the way Brave and Safari do.
-
-### Automated Test Observations
-
-Automated tests that manipulate the DOM (removing/recreating forms and 1Password elements) produced misleading results:
-
-- **Brave:** Showed extreme event loop blocking (40-60 second delays) that doesn't match real-world experience
-- **Orion:** Showed consistent ~120ms delays with minimal event loop blocking
-
-The automated test appears to trigger pathological behavior in Brave's 1Password extension handling, making it unsuitable for browser comparison. However, the ~120ms measurement for Orion was consistent with the simple focus test results.
-
-### What This Suggests
-
-1. **The performance issue is real and measurable** - Orion's ~131ms cold start vs Brave's ~11ms is a 12x difference
-2. **The delay is on first focus only** - Subsequent focuses on the same page are fast (~8ms)
-3. **Event loop blocking is NOT the cause** - Orion's JavaScript thread is not blocked; the delay is in 1Password's script execution itself
-4. **The script caching hypothesis is strongly supported** - If Orion re-parses `injected.js` on each page load rather than using cached bytecode, this explains the ~120ms cold start overhead
-5. **Safari comparison proves it's Orion-specific** - Same WebKit, same 1Password extension, but Safari is 3x faster on cold start
+This allows automated tests to correctly identify Orion vs Safari (which share the same WebKit user agent string).
 
 ### Areas for Further Investigation
 

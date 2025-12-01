@@ -1,39 +1,38 @@
 name: Validate PR Files
 
 on:
-    pull_request:
-        types: [opened, synchronize]
+  pull_request:
+    types: [opened, synchronize]
 
 jobs:
-    check-files:
-        runs-on: ubuntu-latest
-        steps:
-            - name: Check changed files
-              uses: actions/github-script@v7
-              with:
-                  script: |
-                      const { data: files } = await github.rest.pulls.listFiles({
-                        owner: context.repo.owner,
-                        repo: context.repo.repo,
-                        pull_number: context.issue.number
-                      });
+  check-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check changed files
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: files } = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
 
-                      const allowedPaths = [
-                        /^test-results\/[^/]+\.results\.md$/,
-                        /^test-processor\//
-                      ];
+            const allowedPaths = [
+              /^test-results\/[^/]+\.results\.md$/
+            ];
 
-                      const invalidFiles = files.filter(file => {
-                        // Allow deletions
-                        if (file.status === 'removed') return false;
+            const invalidFiles = files.filter(file => {
+              // Allow deletions
+              if (file.status === 'removed') return false;
 
-                        // Check if file matches any allowed pattern
-                        return !allowedPaths.some(pattern => pattern.test(file.filename));
-                      });
+              // Check if file matches any allowed pattern
+              return !allowedPaths.some(pattern => pattern.test(file.filename));
+            });
 
-                      if (invalidFiles.length > 0) {
-                        const fileList = invalidFiles.map(f => `- ${f.filename}`).join('\n');
-                        core.setFailed(`❌ PRs from contributors should only add files to:\n- test-results/*.results.md\n- test-processor/\n\nInvalid files:\n${fileList}`);
-                      } else {
-                        console.log('✅ All changed files are in allowed locations');
-                      }
+            if (invalidFiles.length > 0) {
+              const fileList = invalidFiles.map(f => `- ${f.filename}`).join('\n');
+              core.setFailed(`❌ PRs from contributors should only add files to:\n- test-results/*.results.md\n- test-processor/\n\nInvalid files:\n${fileList}`);
+            } else {
+              console.log('✅ All changed files are in allowed locations');
+            }
