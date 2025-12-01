@@ -1,0 +1,8 @@
+# Ignore MacOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Ignore Windows system files
+Thumbs.db
+Desktop.ini
