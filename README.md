@@ -14,8 +14,8 @@ This repository contains test pages and tools to help diagnose and measure the p
    - http://localhost:8080/
 
 3. **Run the Automated Focus Test** (recommended):
-   - Click "Run Test (3 iterations)"
-   - Copy the JSON results
+   - Click "Extended Test (10 runs)"
+   - Wait for completion and click "Download JSON"
    - Test in multiple browsers for comparison
 
 4. **Record your results** using the template:
@@ -64,13 +64,13 @@ All test pages are located in the `test-pages/` directory.
 - Username, password, and email input fields
 
 **Modes:**
-- **Standard (5 iterations):** Quick test with 15 measurements
-- **Extended (10 iterations):** More thorough test with 30 measurements and a pause between batches
+- **Standard (5 runs):** Quick test with 15 measurements
+- **Extended (10 runs):** More thorough test with 30 measurements and a pause between batches
 
 **How to use:**
 1. Open in Orion with 1Password enabled
-2. Click "Run Extended Test (10 iterations)"
-3. Wait for completion and click "Export Results"
+2. Click "Extended Test (10 runs)"
+3. Wait for completion and click "Download JSON"
 4. Repeat in other browsers (Safari, Brave, etc.) for comparison
 
 ---
