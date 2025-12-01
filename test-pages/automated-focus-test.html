@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Automated 1Password Focus Test</title>
+    <link rel="icon" href="data:,">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a2e;
+            color: #eee;
+        }
+
+        h1 {
+            color: #fff;
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .browser {
+            color: #3498db;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .info {
+            background: #16213e;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #0f3460;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1a4a80;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.primary {
+            background: #27ae60;
+        }
+
+        button.primary:hover {
+            background: #2ecc71;
+        }
+
+        button.danger {
+            background: #c0392b;
+        }
+
+        button.danger:hover {
+            background: #e74c3c;
+        }
+
+        .test-form {
+            background: #16213e;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .field {
+            margin-bottom: 15px;
+        }
+
+        .field:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #888;
+            font-size: 12px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #333;
+            border-radius: 4px;
+            background: #0d1117;
+            color: #fff;
+            font-size: 16px;
+        }
+
+        input:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
+        .status {
+            background: #0d1117;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status.running {
+            border-color: #f39c12;
+        }
+
+        .status.complete {
+            border-color: #27ae60;
+        }
+
+        .results {
+            background: #0d1117;
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .results h3 {
+            margin: 0;
+            padding: 15px;
+            background: #16213e;
+            color: #3498db;
+            font-size: 14px;
+        }
+
+        .results-content {
+            padding: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            padding: 8px 12px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+
+        th {
+            color: #888;
+            font-weight: normal;
+        }
+
+        .fast {
+            color: #2ecc71;
+        }
+
+        .medium {
+            color: #f39c12;
+        }
+
+        .slow {
+            color: #e74c3c;
+        }
+
+        .summary {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+
+        .export-data {
+            margin-top: 15px;
+            padding: 10px;
+            background: #16213e;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 11px;
+            word-break: break-all;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .progress {
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: #3498db;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Automated 1Password Focus Test</h1>
+    <div class="browser" id="browser">Detecting browser...</div>
+
+    <div class="info">
+        <strong>How it works:</strong> This test automatically focuses each input field and measures
+        how long it takes for 1Password's button to appear. No DOM manipulation is performed -
+        the form stays intact throughout the test, mimicking real user behavior.
+        <br><br>
+        <strong>Standard Test (5 runs):</strong> Quick consistency check with 5 iterations.
+        <br>
+        <strong>Extended Test (10 runs):</strong> Two batches of 5 with a 5-second pause between them to measure
+        consistency over time.
+    </div>
+
+    <div class="controls">
+        <button class="primary" id="runBtn" onclick="runTest(5)">▶ Standard Test (5 runs)</button>
+        <button id="runExtendedBtn" onclick="runTest(10, true)">⏱ Extended Test (10 runs)</button>
+        <button class="danger" id="resetBtn" onclick="resetAll()">Reset</button>
+    </div>
+
+    <div class="status" id="status">
+        Ready to test. Click "Standard Test" or "Extended Test" to begin.
+        <div class="progress" style="display: none;" id="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+    </div>
+
+    <form class="test-form" id="testForm" autocomplete="on" onsubmit="return false;">
+        <div class="field">
+            <label>Username</label>
+            <input type="text" id="username" name="username" autocomplete="username">
+        </div>
+        <div class="field">
+            <label>Password</label>
+            <input type="password" id="password" name="password" autocomplete="current-password">
+        </div>
+        <div class="field">
+            <label>Email</label>
+            <input type="email" id="email" name="email" autocomplete="email">
+        </div>
+    </form>
+
+    <div class="results">
+        <h3>Test Results</h3>
+        <div class="results-content" id="resultsContent">
+            <p style="color: #666;">No results yet. Run the test to see timing data.</p>
+        </div>
+    </div>
+
+    <script>
+        // ========== Configuration ==========
+        const FIELDS = ['username', 'password', 'email'];
+        const TIMEOUT_MS = 2000;
+        const DELAY_BETWEEN_FIELDS = 500;  // Let 1Password settle between fields
+        const DELAY_BETWEEN_ITERATIONS = 1000;
+        const EXTENDED_PAUSE_MS = 5000;  // Pause between batches in extended test
+        const BATCH_SIZE = 5;  // Iterations per batch in extended test
+
+        // ========== State ==========
+        let allResults = [];
+        let isRunning = false;
+        let pendingFocus = null;
+        let observer = null;
+        let testMode = 'standard';  // 'standard' or 'extended'
+
+        // ========== Browser Detection ==========
+        function detectBrowser() {
+            const ua = navigator.userAgent;
+
+            // Orion detection - check for Orion-specific globals
+            // Orion exposes: window.OrionInternals, window.kagi, window.KAGI
+            if (typeof window.OrionInternals !== 'undefined' ||
+                typeof window.kagi !== 'undefined' ||
+                typeof window.KAGI !== 'undefined') {
+                return 'Orion';
+            }
+
+            // Brave has its own detection API
+            if (navigator.brave && navigator.brave.isBrave) return 'Brave';
+            if (ua.includes('Brave')) return 'Brave';
+
+            // Edge before Chrome (both have Chrome in UA)
+            if (ua.includes('Edg/')) return 'Edge';
+
+            // Opera before Chrome
+            if (ua.includes('OPR/') || ua.includes('Opera')) return 'Opera';
+
+            // Chrome (but not Safari's Chrome-like UA)
+            if (ua.includes('Chrome') && !ua.includes('Safari')) return 'Chrome';
+            if (ua.includes('Chrome')) return 'Chrome';
+
+            // Firefox
+            if (ua.includes('Firefox')) return 'Firefox';
+
+            // Safari (must be last - many browsers include Safari in UA)
+            if (ua.includes('Safari')) return 'Safari';
+
+            return 'Unknown';
+        }
+
+        const browserName = detectBrowser();
+        document.getElementById('browser').textContent = `Browser: ${browserName}`;
+
+        // Use detected browser for all results (no manual override to prevent data conflation)
+        const effectiveBrowser = browserName;
+
+        // ========== Mutation Observer ==========
+        function setupObserver() {
+            if (observer) return;
+
+            observer = new MutationObserver((mutations) => {
+                if (!pendingFocus) return;
+
+                for (const mutation of mutations) {
+                    for (const node of mutation.addedNodes) {
+                        if (node.nodeType !== 1) continue;
+                        const tag = node.tagName?.toLowerCase() || '';
+
+                        if (tag === 'com-1password-button' || tag.includes('1password')) {
+                            const elapsed = performance.now() - pendingFocus.startTime;
+                            pendingFocus.resolve({ field: pendingFocus.field, elapsed, timeout: false });
+                            pendingFocus = null;
+                            return;
+                        }
+                    }
+                }
+            });
+
+            observer.observe(document.documentElement, {
+                childList: true,
+                subtree: true
+            });
+        }
+
+        // ========== Test Single Field ==========
+        function testField(fieldId) {
+            return new Promise((resolve) => {
+                const input = document.getElementById(fieldId);
+                if (!input) {
+                    resolve({ field: fieldId, elapsed: -1, timeout: true, error: 'not found' });
+                    return;
+                }
+
+                // Check if 1Password button already exists
+                const existing = document.querySelector('com-1password-button');
+                if (existing) {
+                    // Already decorated - this is a "warm" state
+                    // We still focus to measure response time
+                }
+
+                const startTime = performance.now();
+
+                pendingFocus = {
+                    field: fieldId,
+                    startTime,
+                    resolve
+                };
+
+                // Set up timeout
+                const timeoutId = setTimeout(() => {
+                    if (pendingFocus && pendingFocus.field === fieldId) {
+                        pendingFocus = null;
+                        resolve({ field: fieldId, elapsed: TIMEOUT_MS, timeout: true });
+                    }
+                }, TIMEOUT_MS);
+
+                // Override resolve to clear timeout
+                const originalResolve = resolve;
+                pendingFocus.resolve = (result) => {
+                    clearTimeout(timeoutId);
+                    originalResolve(result);
+                };
+
+                // Focus the input
+                input.focus();
+            });
+        }
+
+        // ========== Run Full Test ==========
+        async function runTest(iterations = 5, isExtended = false) {
+            if (isRunning) return;
+            isRunning = true;
+            testMode = isExtended ? 'extended' : 'standard';
+
+            const runBtn = document.getElementById('runBtn');
+            const runExtendedBtn = document.getElementById('runExtendedBtn');
+            runBtn.disabled = true;
+            runExtendedBtn.disabled = true;
+
+            const statusEl = document.getElementById('status');
+            const progressEl = document.getElementById('progress');
+            const progressBar = document.getElementById('progressBar');
+
+            statusEl.className = 'status running';
+            progressEl.style.display = 'block';
+
+            const totalSteps = iterations * FIELDS.length;
+            let currentStep = 0;
+
+            console.log(`\n========== Starting ${isExtended ? 'EXTENDED' : 'STANDARD'} test: ${iterations} iteration(s) ==========`);
+            console.log(`Browser: ${effectiveBrowser}`);
+            console.log(`Timestamp: ${new Date().toISOString()}`);
+
+            for (let iter = 1; iter <= iterations; iter++) {
+                // Extended test: pause between batches
+                if (isExtended && iter === BATCH_SIZE + 1) {
+                    console.log(`\n--- PAUSE: ${EXTENDED_PAUSE_MS / 1000}s cool-down between batches ---`);
+                    statusEl.innerHTML = `<strong>⏸ Cool-down pause...</strong> Waiting ${EXTENDED_PAUSE_MS / 1000}s before batch 2 to measure consistency.
+                        <div class="progress"><div class="progress-bar" style="width: ${(currentStep / totalSteps) * 100}%"></div></div>`;
+                    await sleep(EXTENDED_PAUSE_MS);
+                }
+
+                const batchNum = isExtended ? (iter <= BATCH_SIZE ? 1 : 2) : null;
+                const batchLabel = batchNum ? ` [Batch ${batchNum}]` : '';
+                console.log(`\n--- Iteration ${iter}/${iterations}${batchLabel} ---`);
+
+                for (const fieldId of FIELDS) {
+                    currentStep++;
+                    progressBar.style.width = `${(currentStep / totalSteps) * 100}%`;
+                    statusEl.innerHTML = `Testing: <strong>${fieldId}</strong> (iteration ${iter}/${iterations}${batchLabel})...
+                        <div class="progress"><div class="progress-bar" style="width: ${(currentStep / totalSteps) * 100}%"></div></div>`;
+
+                    // Blur any focused element first
+                    document.activeElement?.blur();
+                    await sleep(100);
+
+                    const result = await testField(fieldId);
+                    result.iteration = iter;
+                    result.batch = batchNum;
+                    result.browser = effectiveBrowser;
+                    result.timestamp = Date.now();
+                    allResults.push(result);
+
+                    console.log(`[${fieldId}] ${result.timeout ? 'TIMEOUT' : result.elapsed.toFixed(1) + 'ms'}`);
+
+                    // Wait between fields
+                    await sleep(DELAY_BETWEEN_FIELDS);
+                }
+
+                // Wait between iterations (but not before extended pause)
+                if (iter < iterations && !(isExtended && iter === BATCH_SIZE)) {
+                    statusEl.innerHTML = `Waiting before iteration ${iter + 1}...
+                        <div class="progress"><div class="progress-bar" style="width: ${(currentStep / totalSteps) * 100}%"></div></div>`;
+                    await sleep(DELAY_BETWEEN_ITERATIONS);
+                }
+            }
+
+            console.log(`\n========== Test complete ==========\n`);
+
+            statusEl.className = 'status complete';
+            statusEl.innerHTML = `✓ Test complete! ${iterations} iteration(s), ${allResults.length} measurements.`;
+            progressEl.style.display = 'none';
+
+            updateResultsDisplay();
+
+            isRunning = false;
+            runBtn.disabled = false;
+            runExtendedBtn.disabled = false;
+        }
+
+        // ========== Display Results ==========
+        function calculateStdDev(values) {
+            if (values.length < 2) return 0;
+            const avg = values.reduce((a, b) => a + b, 0) / values.length;
+            const squareDiffs = values.map(v => Math.pow(v - avg, 2));
+            return Math.sqrt(squareDiffs.reduce((a, b) => a + b, 0) / values.length);
+        }
+
+        function getConsistencyRating(stdDev, avg, min, max) {
+            // For very fast results (avg < 20ms), use absolute range instead of CV
+            // because small absolute variations create misleadingly high CV percentages
+            if (avg < 20) {
+                const range = max - min;
+                if (range < 15) return { label: '✓ Excellent', class: 'fast' };
+                if (range < 30) return { label: '~ Good', class: 'medium' };
+                if (range < 50) return { label: '⚠️ Variable', class: 'slow' };
+                return { label: '⚠️ Inconsistent', class: 'slow' };
+            }
+
+            // For slower results, use coefficient of variation
+            const cv = (stdDev / avg) * 100;
+            if (cv < 20) return { label: '✓ Excellent', class: 'fast' };
+            if (cv < 35) return { label: '~ Good', class: 'medium' };
+            if (cv < 50) return { label: '⚠️ Variable', class: 'slow' };
+            return { label: '⚠️ Inconsistent', class: 'slow' };
+        }
+
+        function updateResultsDisplay() {
+            const container = document.getElementById('resultsContent');
+
+            if (allResults.length === 0) {
+                container.innerHTML = '<p style="color: #666;">No results yet. Run the test to see timing data.</p>';
+                return;
+            }
+
+            // Group by field
+            const byField = {};
+            for (const r of allResults) {
+                if (!byField[r.field]) byField[r.field] = [];
+                byField[r.field].push(r);
+            }
+
+            // Build table
+            let html = `<table>
+                <thead>
+                    <tr>
+                        <th>Iteration</th>
+                        ${testMode === 'extended' ? '<th>Batch</th>' : ''}
+                        <th>Field</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            for (const r of allResults) {
+                const className = r.timeout ? 'slow' : r.elapsed < 50 ? 'fast' : r.elapsed < 150 ? 'medium' : 'slow';
+                const timeText = r.timeout ? 'timeout' : `${r.elapsed.toFixed(0)}ms`;
+                const status = r.timeout ? '⚠️ No response' : r.elapsed < 50 ? '✓ Fast' : r.elapsed < 150 ? '~ OK' : '⚠️ Slow';
+
+                html += `<tr>
+                    <td>#${r.iteration}</td>
+                    ${testMode === 'extended' ? `<td>${r.batch || '-'}</td>` : ''}
+                    <td>${r.field}</td>
+                    <td class="${className}">${timeText}</td>
+                    <td class="${className}">${status}</td>
+                </tr>`;
+            }
+
+            html += '</tbody></table>';
+
+            // Summary stats
+            const validResults = allResults.filter(r => !r.timeout);
+            const times = validResults.map(r => r.elapsed);
+
+            if (times.length > 0) {
+                const avg = times.reduce((a, b) => a + b, 0) / times.length;
+                const min = Math.min(...times);
+                const max = Math.max(...times);
+                const stdDev = calculateStdDev(times);
+                const consistency = getConsistencyRating(stdDev, avg, min, max);
+                const avgClass = avg < 50 ? 'fast' : avg < 150 ? 'medium' : 'slow';
+
+                // Cold vs warm analysis (iteration 1 vs rest)
+                const coldResults = validResults.filter(r => r.iteration === 1);
+                const warmResults = validResults.filter(r => r.iteration > 1);
+                const coldAvg = coldResults.length > 0 ? coldResults.map(r => r.elapsed).reduce((a, b) => a + b, 0) / coldResults.length : 0;
+                const warmAvg = warmResults.length > 0 ? warmResults.map(r => r.elapsed).reduce((a, b) => a + b, 0) / warmResults.length : 0;
+
+                html += `<div class="summary">
+                    <div class="summary-row">
+                        <span>Overall Average:</span>
+                        <strong class="${avgClass}">${avg.toFixed(0)}ms</strong>
+                    </div>
+                    <div class="summary-row">
+                        <span>Range:</span>
+                        <span>${min.toFixed(0)}ms - ${max.toFixed(0)}ms</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Std Deviation:</span>
+                        <span>${stdDev.toFixed(1)}ms</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Consistency:</span>
+                        <span class="${consistency.class}">${consistency.label}</span>
+                    </div>`;
+
+                // Cold vs warm breakdown
+                if (coldResults.length > 0 && warmResults.length > 0) {
+                    const coldClass = coldAvg < 50 ? 'fast' : coldAvg < 150 ? 'medium' : 'slow';
+                    const warmClass = warmAvg < 50 ? 'fast' : warmAvg < 150 ? 'medium' : 'slow';
+                    html += `
+                    <div class="summary-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
+                        <span>Cold Start (iter 1):</span>
+                        <strong class="${coldClass}">${coldAvg.toFixed(0)}ms</strong>
+                    </div>
+                    <div class="summary-row">
+                        <span>Warm (iter 2+):</span>
+                        <strong class="${warmClass}">${warmAvg.toFixed(0)}ms</strong>
+                    </div>`;
+                }
+
+                // Batch comparison for extended tests
+                if (testMode === 'extended') {
+                    const batch1Results = validResults.filter(r => r.batch === 1);
+                    const batch2Results = validResults.filter(r => r.batch === 2);
+
+                    if (batch1Results.length > 0 && batch2Results.length > 0) {
+                        const batch1Avg = batch1Results.map(r => r.elapsed).reduce((a, b) => a + b, 0) / batch1Results.length;
+                        const batch2Avg = batch2Results.map(r => r.elapsed).reduce((a, b) => a + b, 0) / batch2Results.length;
+                        const batch1Class = batch1Avg < 50 ? 'fast' : batch1Avg < 150 ? 'medium' : 'slow';
+                        const batch2Class = batch2Avg < 50 ? 'fast' : batch2Avg < 150 ? 'medium' : 'slow';
+                        const diff = batch2Avg - batch1Avg;
+                        const diffSign = diff > 0 ? '+' : '';
+
+                        html += `
+                    <div class="summary-row" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #333;">
+                        <span>Batch 1 Avg (runs 1-5):</span>
+                        <strong class="${batch1Class}">${batch1Avg.toFixed(0)}ms</strong>
+                    </div>
+                    <div class="summary-row">
+                        <span>Batch 2 Avg (runs 6-10):</span>
+                        <strong class="${batch2Class}">${batch2Avg.toFixed(0)}ms</strong>
+                    </div>
+                    <div class="summary-row">
+                        <span>Batch Difference:</span>
+                        <span>${diffSign}${diff.toFixed(0)}ms</span>
+                    </div>`;
+                    }
+                }
+
+                html += `
+                    <div class="summary-row" style="margin-top: 10px;">
+                        <span>Measurements:</span>
+                        <span>${validResults.length} successful, ${allResults.length - validResults.length} timeouts</span>
+                    </div>
+                </div>`;
+            }
+
+            // Export data
+            const exportData = {
+                schemaVersion: 1,
+                browser: effectiveBrowser,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+                testMode: testMode,
+                results: allResults,
+                summary: times.length > 0 ? {
+                    average: times.reduce((a, b) => a + b, 0) / times.length,
+                    min: Math.min(...times),
+                    max: Math.max(...times),
+                    stdDev: calculateStdDev(times),
+                    count: times.length,
+                    coldAvg: allResults.filter(r => !r.timeout && r.iteration === 1).length > 0 ?
+                        allResults.filter(r => !r.timeout && r.iteration === 1).map(r => r.elapsed).reduce((a, b) => a + b, 0) /
+                        allResults.filter(r => !r.timeout && r.iteration === 1).length : null,
+                    warmAvg: allResults.filter(r => !r.timeout && r.iteration > 1).length > 0 ?
+                        allResults.filter(r => !r.timeout && r.iteration > 1).map(r => r.elapsed).reduce((a, b) => a + b, 0) /
+                        allResults.filter(r => !r.timeout && r.iteration > 1).length : null
+                } : null
+            };
+
+            html += `<div class="export-data" id="exportData">${JSON.stringify(exportData)}</div>`;
+            html += `<button onclick="downloadExport()" style="margin-top: 10px;">💾 Download JSON</button>`;
+            html += `<button onclick="copyExport()" style="margin-top: 10px; margin-left: 5px;">📋 Copy</button>`;
+
+            container.innerHTML = html;
+        }
+
+        function generateFilename() {
+            const browser = effectiveBrowser.toLowerCase().replace(/[^a-z0-9]/g, '-');
+            const date = new Date().toISOString().slice(0, 10);  // YYYY-MM-DD
+            const time = new Date().toISOString().slice(11, 16).replace(':', '');  // HHMM
+            return `focus-timing-${browser}-${date}-${time}.json`;
+        }
+
+        function downloadExport() {
+            const data = document.getElementById('exportData').textContent;
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = generateFilename();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function copyExport() {
+            const data = document.getElementById('exportData').textContent;
+            navigator.clipboard.writeText(data).then(() => {
+                alert('Results copied to clipboard!');
+            });
+        }
+
+        function resetAll() {
+            allResults = [];
+            pendingFocus = null;
+            testMode = 'standard';
+            const statusEl = document.getElementById('status');
+            const progressEl = document.getElementById('progress');
+            // Hide progress BEFORE resetting innerHTML (progress is inside status)
+            if (progressEl) progressEl.style.display = 'none';
+            statusEl.className = 'status';
+            statusEl.innerHTML = `Ready to test. Click "Standard Test" or "Extended Test" to begin.
+                <div class="progress" style="display: none;" id="progress">
+                    <div class="progress-bar" id="progressBar"></div>
+                </div>`;
+            updateResultsDisplay();
+            console.clear();
+            console.log('Test reset.');
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // ========== Initialize ==========
+        setupObserver();
+        console.log('Automated Focus Test ready.');
+        console.log(`Browser detected: ${browserName} (effective: ${effectiveBrowser})`);
+    </script>
+</body>
+
+</html>

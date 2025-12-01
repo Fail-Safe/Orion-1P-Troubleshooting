@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Speedometer - 1Password Impact Test</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #007aff;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+        }
+
+        button {
+            background: #007aff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007aff, #00c6ff);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .status {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .results {
+            font-family: 'SF Mono', Monaco, monospace;
+            background: #1a1a2e;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            font-size: 13px;
+            min-height: 150px;
+        }
+
+        #test-frame {
+            width: 100%;
+            height: 300px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            background: white;
+        }
+
+        .score-display {
+            font-size: 48px;
+            font-weight: bold;
+            text-align: center;
+            padding: 20px;
+            color: #007aff;
+        }
+
+        .score-label {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f8f8;
+        }
+
+        .slow {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .fast {
+            color: #27ae60;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>⚡ Mini Speedometer - 1Password Impact Test</h1>
+
+    <div class="info-box">
+        <strong>Purpose:</strong> A simplified benchmark that creates multiple iframes with input fields to simulate
+        how Speedometer 3.1 triggers repeated 1Password script injections. This helps measure the performance impact
+        without running the full benchmark.
+    </div>
+
+    <div class="controls">
+        <button onclick="runBenchmark()" id="run-btn">Run Benchmark</button>
+        <button onclick="clearResults()" class="secondary">Clear Results</button>
+    </div>
+
+    <div class="test-container">
+        <h2>Test Progress</h2>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+        <div class="status" id="status">Ready to start...</div>
+    </div>
+
+    <div class="test-container">
+        <h2>Current Score</h2>
+        <div class="score-display" id="score">--</div>
+        <div class="score-label">operations per second (higher is better)</div>
+    </div>
+
+    <div class="test-container">
+        <h2>Test Frame</h2>
+        <iframe id="test-frame" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+
+    <div class="test-container">
+        <h2>Results</h2>
+        <table id="comparison-table">
+            <thead>
+                <tr>
+                    <th>Run</th>
+                    <th>Iterations</th>
+                    <th>Total Time</th>
+                    <th>Avg per Iteration</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody id="comparison-body">
+                <tr>
+                    <td colspan="5" style="text-align: center; color: #999;">No results yet</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="test-container" id="export-container" style="display: none;">
+        <h2>Export Results</h2>
+        <button onclick="downloadExport()">💾 Download JSON</button>
+        <p style="color: #666; font-size: 13px; margin-top: 10px;">Save results to <code>test-processor/</code> folder
+            for processing.</p>
+    </div>
+
+    <script>
+        // Browser detection
+        function detectBrowser() {
+            const ua = navigator.userAgent;
+
+            // Orion detection - check for Orion-specific globals
+            if (typeof window.OrionInternals !== 'undefined' ||
+                typeof window.kagi !== 'undefined' ||
+                typeof window.KAGI !== 'undefined') {
+                const safariMatch = ua.match(/Version\/([\d.]+)/);
+                return { name: 'Orion', version: safariMatch ? safariMatch[1] : 'unknown' };
+            }
+
+            // Brave has its own detection API
+            if (navigator.brave && navigator.brave.isBrave) {
+                const match = ua.match(/Chrome\/([\d.]+)/);
+                return { name: 'Brave', version: match ? match[1] : 'unknown' };
+            }
+
+            // Edge before Chrome (both have Chrome in UA)
+            if (ua.includes('Edg/')) {
+                const match = ua.match(/Edg\/([\d.]+)/);
+                return { name: 'Edge', version: match ? match[1] : 'unknown' };
+            }
+
+            // Opera before Chrome
+            if (ua.includes('OPR/') || ua.includes('Opera')) {
+                const match = ua.match(/OPR\/([\d.]+)/);
+                return { name: 'Opera', version: match ? match[1] : 'unknown' };
+            }
+
+            // Chrome
+            if (ua.includes('Chrome')) {
+                const match = ua.match(/Chrome\/([\d.]+)/);
+                return { name: 'Chrome', version: match ? match[1] : 'unknown' };
+            }
+
+            // Firefox
+            if (ua.includes('Firefox')) {
+                const match = ua.match(/Firefox\/([\d.]+)/);
+                return { name: 'Firefox', version: match ? match[1] : 'unknown' };
+            }
+
+            // Safari (must be last - many browsers include Safari in UA)
+            if (ua.includes('Safari')) {
+                const match = ua.match(/Version\/([\d.]+)/);
+                return { name: 'Safari', version: match ? match[1] : 'unknown' };
+            }
+
+            return { name: 'Unknown', version: 'unknown' };
+        }
+
+        const browserInfo = detectBrowser();
+
+        const ITERATIONS = 50; // Number of iframe cycles
+        let runCount = 0;
+        const allRuns = [];
+
+        async function runBenchmark() {
+            const runBtn = document.getElementById('run-btn');
+            runBtn.disabled = true;
+
+            const frame = document.getElementById('test-frame');
+            const progress = document.getElementById('progress');
+            const status = document.getElementById('status');
+            const scoreDisplay = document.getElementById('score');
+
+            const timings = [];
+            runCount++;
+
+            status.textContent = 'Starting benchmark...';
+            scoreDisplay.textContent = '--';
+
+            const overallStart = performance.now();
+
+            for (let i = 0; i < ITERATIONS; i++) {
+                const iterStart = performance.now();
+
+                // Update progress
+                progress.style.width = `${((i + 1) / ITERATIONS) * 100}%`;
+                status.textContent = `Running iteration ${i + 1} of ${ITERATIONS}...`;
+
+                // Create iframe content with login form inputs
+                const content = `
+                    <!DOCTYPE html>
+                    <html>
+                    <body>
+                        <h3>Iteration ${i + 1}</h3>
+                        <form>
+                            <input type="text" placeholder="Username" autocomplete="username">
+                            <input type="password" placeholder="Password" autocomplete="current-password">
+                            <input type="email" placeholder="Email" autocomplete="email">
+                            <button type="submit">Submit</button>
+                        </form>
+                    </body>
+                    </html>
+                `;
+
+                // Load content into iframe
+                await new Promise((resolve) => {
+                    frame.onload = () => {
+                        // Small delay to let 1Password inject
+                        setTimeout(resolve, 10);
+                    };
+                    frame.srcdoc = content;
+                });
+
+                // Simulate focus/blur on inputs (triggers 1Password)
+                try {
+                    const doc = frame.contentDocument;
+                    if (doc) {
+                        const inputs = doc.querySelectorAll('input');
+                        inputs.forEach(input => {
+                            input.focus();
+                            input.blur();
+                        });
+                    }
+                } catch (e) {
+                    // Cross-origin issues, ignore
+                }
+
+                const iterEnd = performance.now();
+                const iterTime = iterEnd - iterStart;
+                timings.push(iterTime);
+
+                // Yield to event loop
+                await new Promise(r => setTimeout(r, 0));
+            }
+
+            const overallEnd = performance.now();
+            const totalTime = overallEnd - overallStart;
+
+            // Calculate statistics
+            const avgTime = timings.reduce((a, b) => a + b, 0) / timings.length;
+            const minTime = Math.min(...timings);
+            const maxTime = Math.max(...timings);
+            const score = (1000 / avgTime).toFixed(2); // ops per second
+
+            // Display results
+            scoreDisplay.textContent = score;
+            status.textContent = `Complete! ${score} ops/sec (avg ${avgTime.toFixed(1)}ms per iteration)`;
+            progress.style.width = '100%';
+
+            // Log detailed results to console for debugging
+            console.log(`Benchmark Complete - Score: ${score} ops/sec`);
+            console.log(`Total: ${totalTime.toFixed(2)}ms, Avg: ${avgTime.toFixed(2)}ms, Min: ${minTime.toFixed(2)}ms, Max: ${maxTime.toFixed(2)}ms`);
+
+            // Save run data
+            const runData = {
+                runNumber: runCount,
+                iterations: ITERATIONS,
+                totalTime: parseFloat(totalTime.toFixed(2)),
+                avgTime: parseFloat(avgTime.toFixed(2)),
+                minTime: parseFloat(minTime.toFixed(2)),
+                maxTime: parseFloat(maxTime.toFixed(2)),
+                score: parseFloat(score),
+                timings: timings.map(t => parseFloat(t.toFixed(2))),
+                timestamp: new Date().toISOString()
+            };
+            allRuns.push(runData);
+            updateComparisonTable();
+            updateExportButton();
+
+            runBtn.disabled = false;
+
+            // Clear frame
+            frame.srcdoc = '<html><body><p>Benchmark complete</p></body></html>';
+        }
+
+        function updateComparisonTable() {
+            const tbody = document.getElementById('comparison-body');
+
+            if (allRuns.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999;">No results yet</td></tr>';
+                return;
+            }
+
+            // Find best score for highlighting
+            const scores = allRuns.map(r => r.score);
+            const maxScore = Math.max(...scores);
+            const minScore = Math.min(...scores);
+
+            tbody.innerHTML = allRuns.map(run => {
+                const scoreClass = run.score === maxScore ? 'fast' :
+                    run.score === minScore ? 'slow' : '';
+                return `
+                    <tr>
+                        <td>#${run.runNumber}</td>
+                        <td>${run.iterations}</td>
+                        <td>${run.totalTime}ms</td>
+                        <td>${run.avgTime}ms</td>
+                        <td class="${scoreClass}">${run.score} ops/sec</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function clearResults() {
+            runCount = 0;
+            allRuns.length = 0;
+            document.getElementById('results').textContent = 'Waiting for benchmark...';
+            document.getElementById('score').textContent = '--';
+            document.getElementById('progress').style.width = '0%';
+            document.getElementById('status').textContent = 'Ready to start...';
+            updateComparisonTable();
+            updateExportButton();
+        }
+
+        function updateExportButton() {
+            const container = document.getElementById('export-container');
+            if (allRuns.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            container.style.display = 'block';
+        }
+
+        function generateFilename() {
+            const browser = browserInfo.name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+            const date = new Date().toISOString().slice(0, 10);
+            const time = new Date().toISOString().slice(11, 16).replace(':', '');
+            return `mini-speedometer-${browser}-${date}-${time}.json`;
+        }
+
+        function downloadExport() {
+            const scores = allRuns.map(r => r.score);
+            const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+
+            const exportData = {
+                schemaVersion: 1,
+                browser: browserInfo.name,
+                browserVersion: browserInfo.version,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+                runs: allRuns,
+                summary: {
+                    totalRuns: allRuns.length,
+                    avgScore: parseFloat(avgScore.toFixed(2)),
+                    minScore: Math.min(...scores),
+                    maxScore: Math.max(...scores)
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = generateFilename();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize
+        console.log('Mini Speedometer loaded');
+        console.log('Browser:', browserInfo.name, browserInfo.version);
+        console.log('User Agent:', navigator.userAgent);
+    </script>
+</body>
+
+</html>
