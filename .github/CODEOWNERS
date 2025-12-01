@@ -1,0 +1,6 @@
+# Protect core files - only maintainers can modify
+* @Fail-Safe
+
+# Allow anyone to add their own results files
+/test-results/*.results.md
+/test-processor/
