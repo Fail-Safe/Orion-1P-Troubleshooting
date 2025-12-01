@@ -23,6 +23,19 @@ This repository contains test pages and tools to help diagnose and measure the p
    cp test-results/TEMPLATE.md test-results/YourUsername.results.md
    ```
 
+---
+
+## Contributing Results
+
+When sharing your results:
+1. Copy `test-results/TEMPLATE.md` to `test-results/YourUsername.results.md`
+2. Run `./scripts/collect-system-info.sh` and paste the output
+3. Export JSON from test pages, drop into `./test-processor/`
+4. Run `./scripts/process-test-results.sh` and paste the formatted output
+5. Add any additional observations
+
+---
+
 ### Alternative Server Options
 
 If you prefer not to use the Swift server:
@@ -145,14 +158,3 @@ Orion-1P-Troubleshooting/
     ├── TEMPLATE.md                # Results template
     └── *.results.md               # Individual test results
 ```
-
----
-
-## Contributing Results
-
-When sharing your results:
-1. Copy `test-results/TEMPLATE.md` to `test-results/YourUsername.results.md`
-2. Run `./scripts/collect-system-info.sh` and paste the output
-3. Export JSON from test pages, drop into `./test-processor/`
-4. Run `./scripts/process-test-results.sh` and paste the formatted output
-5. Add any additional observations
