@@ -65,7 +65,7 @@ In Orion, the same `injected.js` is initiated by dozens of different initiators,
 This suggests the issue is with how Orion handles extension script injection/execution, not with the specific extension variant.
 
 ## Status
-This issue is tagged as **Planned** on the Orion feedback tracker.
+This issue is tagged as **Planned** on the [Orion feedback tracker](https://orionfeedback.org/d/11099-speed-decline-with-1password-extension).
 
 ## Reproduction Steps
 1. Open macOS Activity Monitor to CPU page, sort by % CPU descending
